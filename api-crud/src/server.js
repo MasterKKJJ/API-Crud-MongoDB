@@ -7,7 +7,7 @@ const Autenticate = require("./middlewares/Autenticate");
 const app = express();
 app.use(express.json());
 
-app.use("/auth", AuthController);
+app.use("/user", AuthController);
 app.use("/admin", Autenticate, AdminController);
 
 app.get("/", (req, res) => {
@@ -18,5 +18,7 @@ app.get("/", (req, res) => {
 });
 
 app.listen(process.env.PORT_API_SERVER, () => {
-  console.log("Servidor está rodando! ");
+  console.log(
+    "Servidor está rodando em: https://localhost" + process.env.PORT_API_SERVER
+  );
 });

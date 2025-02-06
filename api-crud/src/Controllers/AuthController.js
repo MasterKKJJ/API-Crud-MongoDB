@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const UserModel = require("../models/User");
 const jwt = require("jsonwebtoken");
+const VerificadorToken = require("../middlewares/VerificadorToken");
 const router = express.Router();
 require("dotenv").config();
 const generateToken = (user = {}) => {
@@ -54,7 +55,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", VerificadorToken, async (req, res) => {
   try {
     const { email, password } = req.body;
     // Encontra o usuário pelo email
@@ -84,6 +85,61 @@ router.post("/login", async (req, res) => {
       message:
         "Erro interno no servidor, tente novamente dentro de alguns minutos"
     });
+  }
+});
+
+router.post("/reset-password", async (req, res) => {
+  try {
+    let token = req.headers.authorization;
+    if (!token) {
+      return res.status(400).json({ message: "Token não fornecido!" });
+    }
+
+    if (token && token.startsWith("Bearer ")) {
+      // Remove a palavra "Bearer" da string
+      token = token.split(" ")[1];
+    }
+
+    if (!token) {
+      return res
+        .status(400)
+        .json({ error: true, message: "Token mal formado!" });
+    }
+
+    // Verificando e decodificando o token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { id } = decoded;
+    const user = await UserModel.findById(id).select("+password");
+    const { passwordOld, newPassword, confirmPassword } = req.body;
+
+    console.log(user);
+    console.log({ passwordOld, newPassword, confirmPassword });
+
+    // Verificando se a nova senha e a confirmação são iguais
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        error: true,
+        message: "A nova senha e a confirmação da nova senha não condizem"
+      });
+    }
+
+    // Verificando se a senha antiga corresponde à armazenada no banco
+    const isPasswordOldValid = await bcrypt.compare(passwordOld, user.password);
+    if (!isPasswordOldValid) {
+      return res.status(400).json({
+        error: true,
+        message: "A senha antiga está incorreta"
+      });
+    }
+    user.password = newPassword;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ error: false, message: "Senha alterada com sucesso!" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: true, message: "Erro interno!" });
   }
 });
 
